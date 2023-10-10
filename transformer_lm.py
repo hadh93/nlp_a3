@@ -167,6 +167,7 @@ def train_lm(args, train_text, dev_text, vocab_index):
         idx = 0
         for ex_idx in ex_idxs:
             idx += 1
+            """
             if idx % 1000 == 0:
                 print(f"Epoch {t+1}: {idx} / {len(ex_idxs)}")
                 print(f"Epoch {t + 1} Loss: {loss_this_epoch}")
@@ -174,6 +175,7 @@ def train_lm(args, train_text, dev_text, vocab_index):
                 avg_log_prob = log_prob / len(dev_text)
                 perplexity = np.exp(-log_prob / len(dev_text))
                 print(f"log_prob: {log_prob}, avg_log_prob: {avg_log_prob}, perplexity: {perplexity}")
+            """
             input_tensor = input_arr_all[ex_idx]
             output_tensor = output_arr_all[ex_idx]
 
