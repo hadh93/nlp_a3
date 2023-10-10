@@ -157,7 +157,7 @@ def train_lm(args, train_text, dev_text, vocab_index):
 
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     ex_idxs = [i for i in range(len(train_text_divided))]
-    num_epochs = 4
+    num_epochs = 3
     for t in range(num_epochs):
         random.seed(t)
         loss_this_epoch = 0.0
