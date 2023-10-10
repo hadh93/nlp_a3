@@ -1,4 +1,3 @@
-# models.py
 import random
 import time
 
@@ -109,7 +108,6 @@ class NeuralLanguageModel(LanguageModel):
 def divide_string(input_string, chunk_length=20):
     return [input_string[i:i + chunk_length] for i in range(0, len(input_string), chunk_length)]
 
-
 def train_lm(args, train_text, dev_text, vocab_index):
     """
     :param args: command-line args, passed through here for your convenience
@@ -128,31 +126,65 @@ def train_lm(args, train_text, dev_text, vocab_index):
     nlm = NeuralLanguageModel(vocab_size, num_positions, d_model, d_internal, num_classes, num_layers, vocab_index)
     model = nlm.encoder
     train_text_divided = divide_string(train_text)
+    input_arr_all = []
+    output_arr_all = []
+    for ex_idx in range(len(train_text_divided)):
+        input_arr = []
+        output_arr = []
+        if ex_idx != len(train_text_divided) - 1:
+            chunk = train_text_divided[ex_idx] + train_text_divided[ex_idx + 1][:5]
+
+            for k in range(0, num_positions + 5):
+                tmp = " " * (num_positions - k) + chunk[:k]
+                if len(tmp) > num_positions:
+                    tmp = tmp[-num_positions:]
+                input_arr.append(tmp)
+            output_arr = input_arr[1:]
+            output_arr.append(chunk[-num_positions:])
+        else:
+            chunk = train_text_divided[ex_idx]
+            for k in range(num_positions):
+                tmp = " " * (num_positions - k) + chunk[:k]
+                input_arr.append(tmp)
+            output_arr = input_arr[1:]
+            output_arr.append(chunk[-num_positions:])
+        input_tensor = []
+        output_tensor = []
+        for sentence in input_arr:
+            input_tensor.append(torch.tensor([vocab_index.index_of(c) for c in sentence], dtype=torch.long))
+        for sentence in output_arr:
+            output_tensor.append(torch.tensor([vocab_index.index_of(c) for c in sentence], dtype=torch.long))
+
+        input_arr_all.append(input_tensor)
+        output_arr_all.append(output_tensor)
+    print()
 
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     ex_idxs = [i for i in range(len(train_text_divided))]
-    random.shuffle(ex_idxs)
     num_epochs = 5
     for t in range(num_epochs):
-        loss_this_epoch = 0.0
         random.seed(t)
+        loss_this_epoch = 0.0
+        random.shuffle(ex_idxs)
+
         loss_fcn = nn.NLLLoss()
         idx = 0
         for ex_idx in ex_idxs:
             idx += 1
-            if idx % 1000 == 0:
+            if idx % 100 == 0:
                 print(f"Epoch {t+1}: {idx} / {len(ex_idxs)}")
                 print(f"Epoch {t + 1} Loss: {loss_this_epoch}")
-            chunk = train_text_divided[ex_idx]
-            for k in range(1,num_positions+1):
-                padded_chunk = " "*(num_positions-k) + chunk[:k]
-                output = model(torch.tensor([vocab_index.index_of(c) for c in padded_chunk], dtype=torch.long))
-                target = torch.tensor([vocab_index.index_of(c) for c in chunk], dtype=torch.long)
+            input_tensor = input_arr_all[ex_idx]
+            output_tensor = output_arr_all[ex_idx]
+
+            for i in range(len(input_tensor)):
+
+                output = model(input_tensor[i])
+                target = output_tensor[i]
+
                 loss = loss_fcn(output, target)
-                loss_this_epoch += loss.item()
+            loss_this_epoch += loss.item()
             model.zero_grad()
             loss.backward()
             optimizer.step()
-
-
     return nlm
