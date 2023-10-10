@@ -60,11 +60,12 @@ class NLModelEncoder(nn.Module):
         self.linear = nn.Linear(d_model, num_classes)
 
     def forward(self, indices):
-        embedded = self.embedding(indices) + self.positional_encoding(indices)
+        embedded = self.embedding(indices)
+        embedded_with_positions = self.positional_encoding(embedded)
 
         mask = torch.triu(torch.ones(len(indices), len(indices)) * float('-inf'), diagonal=1)
 
-        output = self.transformer_encoder(embedded, mask=mask, is_causal=True)
+        output = self.transformer_encoder(embedded_with_positions, mask=mask, is_causal=True)
         output = self.linear(output)
         return output
 
