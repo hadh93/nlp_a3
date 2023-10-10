@@ -1,3 +1,4 @@
+import math
 import random
 import time
 
@@ -57,7 +58,7 @@ class NLModelEncoder(nn.Module):
         encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=4, dim_feedforward=d_internal)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_layers)
         self.linear = nn.Linear(d_model, num_classes)
-        self.softmax = nn.LogSoftmax()
+        self.log_softmax = nn.LogSoftmax()
 
     def forward(self, indices):
         embedded = self.embedding(indices)
@@ -67,7 +68,7 @@ class NLModelEncoder(nn.Module):
 
         output = self.transformer_encoder(embedded_with_positions, mask=mask, is_causal=True)
         output = self.linear(output)
-        return self.softmax(output)
+        return self.log_softmax(output)
 
 
 class NeuralLanguageModel(LanguageModel):
@@ -80,28 +81,23 @@ class NeuralLanguageModel(LanguageModel):
     def get_next_char_log_probs(self, context):
         if not context:
             return np.zeros(self.vocab_size)
-
-        self.encoder.eval()
+        context = " " * (self.num_positions - len(context)) + context
         with torch.no_grad():
             input_indices = [self.indexer.index_of(c) for c in context]
-            input_indices = input_indices[-self.num_positions:]
             input_tensor = torch.tensor(input_indices, dtype=torch.long)
-            input_tensor = input_tensor.unsqueeze(0)
-#            print("Input tensor shape:", input_tensor.shape)
             output = self.encoder(input_tensor)
-#            print("Output tensor shape:", output.shape)
-            log_probs = nn.functional.log_softmax(output, dim=2)
-#            print("Log probs tensor shape:", log_probs.shape)
+            output = output[-1,:]
 
-        return np.asarray(log_probs[0, -1, :])
+        return np.asarray(output)
 
     def get_log_prob_sequence(self, next_chars, context):
-        self.encoder.eval()
         log_prob = 0.0
+        context = " "* (self.num_positions - len(context)) + context
         for char in next_chars:
+            # print(f"Chunk context: ({context}), Gold: {char}, prob:{log_prob}")
             log_probs = self.get_next_char_log_probs(context)
             log_prob += log_probs[self.indexer.index_of(char)]
-            context += char
+            context = context[1:]+char
         return log_prob
 
 
@@ -116,6 +112,7 @@ def train_lm(args, train_text, dev_text, vocab_index):
     :param vocab_index: an Indexer of the character vocabulary (27 characters)
     :return: a NeuralLanguageModel instance trained on the given data
     """
+
 
     vocab_size = len(vocab_index)
     num_positions = 20;
@@ -157,7 +154,6 @@ def train_lm(args, train_text, dev_text, vocab_index):
 
         input_arr_all.append(input_tensor)
         output_arr_all.append(output_tensor)
-    print()
 
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     ex_idxs = [i for i in range(len(train_text_divided))]
@@ -171,9 +167,13 @@ def train_lm(args, train_text, dev_text, vocab_index):
         idx = 0
         for ex_idx in ex_idxs:
             idx += 1
-            if idx % 100 == 0:
+            if idx % 1000 == 0:
                 print(f"Epoch {t+1}: {idx} / {len(ex_idxs)}")
                 print(f"Epoch {t + 1} Loss: {loss_this_epoch}")
+                log_prob = nlm.get_log_prob_sequence(dev_text, "")
+                avg_log_prob = log_prob / len(dev_text)
+                perplexity = np.exp(-log_prob / len(dev_text))
+                print(f"log_prob: {log_prob}, avg_log_prob: {avg_log_prob}, perplexity: {perplexity}")
             input_tensor = input_arr_all[ex_idx]
             output_tensor = output_arr_all[ex_idx]
 
@@ -187,4 +187,5 @@ def train_lm(args, train_text, dev_text, vocab_index):
             model.zero_grad()
             loss.backward()
             optimizer.step()
+    model.eval()
     return nlm

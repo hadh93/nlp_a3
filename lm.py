@@ -65,6 +65,7 @@ def run_sanity_check(lm, vocab_index):
             if abs(log_prob_from_single_probs - log_prob) > 1e-3:
                 sane = False
                 print("ERROR: sanity checks failed, LM prob from sequence and single characters disagree: %f %f" % (log_prob, log_prob_from_single_probs))
+                print(f"Context: {context} sequence: {next_seqs}")
     return sane
 
 
