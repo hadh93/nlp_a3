@@ -58,6 +58,7 @@ class NLModelEncoder(nn.Module):
         encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=4, dim_feedforward=d_internal)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_layers)
         self.linear = nn.Linear(d_model, num_classes)
+        self.softmax = nn.LogSoftmax()
 
     def forward(self, indices):
         embedded = self.embedding(indices)
@@ -67,7 +68,7 @@ class NLModelEncoder(nn.Module):
 
         output = self.transformer_encoder(embedded_with_positions, mask=mask, is_causal=True)
         output = self.linear(output)
-        return output
+        return self.softmax(output)
 
 
 class NeuralLanguageModel(LanguageModel):
@@ -142,16 +143,15 @@ def train_lm(args, train_text, dev_text, vocab_index):
             if idx % 100 == 0:
                 print(f"Epoch {t+1}: {idx} / {len(ex_idxs)}")
             chunk = train_text_divided[ex_idx]
-            for k in range(1, num_positions + 1):
-                padded_chunk = " " * (num_positions - k) + chunk[:k]
+            for k in range(1,num_positions+1):
+                padded_chunk = " "*(num_positions-k) + chunk[:k]
                 output = model(torch.tensor([vocab_index.index_of(c) for c in padded_chunk], dtype=torch.long))
-                target = torch.tensor([vocab_index.index_of(c) for c in chunk[:k]], dtype=torch.long)
+                target = torch.tensor([vocab_index.index_of(c) for c in chunk], dtype=torch.long)
                 loss = loss_fcn(output, target)
                 loss_this_epoch += loss.item()
-
-                model.zero_grad()
-                loss.backward()
-                optimizer.step()
+            model.zero_grad()
+            loss.backward()
+            optimizer.step()
             print(f"Epoch {t+1} Loss: {loss_this_epoch}")
 
     return nlm
