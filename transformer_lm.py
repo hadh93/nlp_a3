@@ -132,7 +132,7 @@ def train_lm(args, train_text, dev_text, vocab_index):
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     ex_idxs = [i for i in range(len(train_text_divided))]
     random.shuffle(ex_idxs)
-    num_epochs = 1
+    num_epochs = 5
     for t in range(num_epochs):
         loss_this_epoch = 0.0
         random.seed(t)
@@ -140,8 +140,9 @@ def train_lm(args, train_text, dev_text, vocab_index):
         idx = 0
         for ex_idx in ex_idxs:
             idx += 1
-            if idx % 100 == 0:
+            if idx % 1000 == 0:
                 print(f"Epoch {t+1}: {idx} / {len(ex_idxs)}")
+                print(f"Epoch {t + 1} Loss: {loss_this_epoch}")
             chunk = train_text_divided[ex_idx]
             for k in range(1,num_positions+1):
                 padded_chunk = " "*(num_positions-k) + chunk[:k]
@@ -152,6 +153,6 @@ def train_lm(args, train_text, dev_text, vocab_index):
             model.zero_grad()
             loss.backward()
             optimizer.step()
-            print(f"Epoch {t+1} Loss: {loss_this_epoch}")
+
 
     return nlm
